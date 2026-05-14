@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Velio Sanitizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+      font-size: 14px;
+      background: #0f1117;
+      color: #c9d1d9;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #e6edf3;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      font-size: 0.8rem;
+      color: #6e7681;
+      margin-bottom: 2rem;
+    }
+
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: #8b949e;
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    textarea {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      font-family: inherit;
+      font-size: 13px;
+      padding: 0.6rem;
+      resize: vertical;
+      outline: none;
+    }
+
+    textarea:focus { border-color: #58a6ff; }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    button {
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 0.4rem 1.2rem;
+    }
+
+    button:hover { background: #2ea043; }
+    button:active { background: #1a7f37; }
+
+    .mode-toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .mode-toggle input[type="radio"] { display: none; }
+
+    .mode-toggle label {
+      margin: 0;
+      padding: 0.4rem 0.9rem;
+      cursor: pointer;
+      color: #8b949e;
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 13px;
+      background: #0d1117;
+      border-right: 1px solid #30363d;
+      user-select: none;
+    }
+
+    .mode-toggle label:last-of-type { border-right: none; }
+
+    .mode-toggle input[type="radio"]:checked + label {
+      background: #21262d;
+      color: #e6edf3;
+    }
+
+    .output-area {
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      color: #c9d1d9;
+      font-size: 13px;
+      min-height: 6rem;
+      padding: 0.6rem;
+      line-height: 1.6;
+    }
+
+    .output-area.empty { color: #6e7681; font-style: italic; }
+
+    /* highlight [U+XXXX] markers */
+    .marker {
+      background: #3d1f00;
+      border: 1px solid #7d3b00;
+      border-radius: 3px;
+      color: #f0883e;
+      font-size: 11px;
+      padding: 0 3px;
+    }
+
+    .findings {
+      margin-top: 1rem;
+    }
+
+    .findings table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 12px;
+    }
+
+    .findings th {
+      color: #8b949e;
+      font-weight: 400;
+      padding: 0.3rem 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .findings td {
+      padding: 0.3rem 0.5rem;
+      border-bottom: 1px solid #21262d;
+      color: #c9d1d9;
+    }
+
+    .findings td.zero { color: #6e7681; }
+    .findings td.nonzero { color: #f0883e; font-weight: 600; }
+
+    .codepoints {
+      margin-top: 0.5rem;
+      font-size: 11px;
+      color: #8b949e;
+      word-break: break-all;
+    }
+
+    .codepoints span {
+      background: #21262d;
+      border-radius: 3px;
+      display: inline-block;
+      margin: 2px;
+      padding: 1px 5px;
+    }
+
+    .error-msg {
+      color: #f85149;
+      font-size: 12px;
+      margin-top: 0.5rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Velio Sanitizer</h1>
+  <p class="subtitle">Deterministic removal of invisible and control-based prompt injection vectors.</p>
+
+  <div class="grid">
+    <div class="panel">
+      <label>Input text</label>
+      <textarea id="input" rows="8" placeholder="Paste untrusted text here..."></textarea>
+
+      <div class="controls">
+        <button id="btn">Sanitize</button>
+        <div class="mode-toggle">
+          <input type="radio" name="mode" id="mode-mark" value="mark" checked>
+          <label for="mode-mark">mark</label>
+          <input type="radio" name="mode" id="mode-strip" value="strip">
+          <label for="mode-strip">strip</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <label>Output</label>
+      <div class="output-area empty" id="output">Output will appear here.</div>
+      <div id="error" class="error-msg" style="display:none"></div>
+
+      <div class="findings" id="findings" style="display:none">
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Removed</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Control (Cc)</td><td id="f-control" class="zero">0</td></tr>
+            <tr><td>Format (Cf)</td><td id="f-format" class="zero">0</td></tr>
+            <tr><td>Bidi</td><td id="f-bidi" class="zero">0</td></tr>
+            <tr><td><strong>Total</strong></td><td id="f-total" class="zero">0</td></tr>
+          </tbody>
+        </table>
+        <div class="codepoints" id="codepoints"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const btn = document.getElementById("btn");
+    const inputEl = document.getElementById("input");
+    const outputEl = document.getElementById("output");
+    const errorEl = document.getElementById("error");
+    const findingsEl = document.getElementById("findings");
+
+    function cell(id, value) {
+      const el = document.getElementById(id);
+      el.textContent = value;
+      el.className = value === 0 ? "zero" : "nonzero";
+    }
+
+    function renderOutput(text, mode) {
+      if (mode !== "mark") {
+        outputEl.textContent = text;
+        return;
+      }
+      // Highlight [U+XXXX] tokens produced by mark mode.
+      const parts = text.split(/(\[U\+[0-9A-F]{4,6}\])/);
+      outputEl.innerHTML = "";
+      for (const part of parts) {
+        if (/^\[U\+[0-9A-F]{4,6}\]$/.test(part)) {
+          const span = document.createElement("span");
+          span.className = "marker";
+          span.textContent = part;
+          outputEl.appendChild(span);
+        } else {
+          // Use textContent on a text node — never set innerHTML from input.
+          outputEl.appendChild(document.createTextNode(part));
+        }
+      }
+    }
+
+    btn.addEventListener("click", async () => {
+      const text = inputEl.value;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+
+      errorEl.style.display = "none";
+      findingsEl.style.display = "none";
+      outputEl.className = "output-area empty";
+      outputEl.textContent = "Sanitizing...";
+
+      let resp, data;
+      try {
+        resp = await fetch("/sanitize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, mode }),
+        });
+        data = await resp.json();
+      } catch (e) {
+        outputEl.textContent = "";
+        errorEl.textContent = "Network error: " + e.message;
+        errorEl.style.display = "block";
+        return;
+      }
+
+      if (!resp.ok) {
+        outputEl.textContent = "";
+        const detail = data.detail?.[0]?.msg ?? JSON.stringify(data.detail);
+        errorEl.textContent = "Error " + resp.status + ": " + detail;
+        errorEl.style.display = "block";
+        return;
+      }
+
+      outputEl.className = "output-area";
+      renderOutput(data.text, mode);
+
+      const f = data.findings;
+      cell("f-control", f.removed_control);
+      cell("f-format", f.removed_format);
+      cell("f-bidi", f.removed_bidi);
+      cell("f-total", f.total);
+
+      const cpEl = document.getElementById("codepoints");
+      cpEl.innerHTML = "";
+      if (f.codepoints.length > 0) {
+        const label = document.createTextNode("Removed codepoints: ");
+        cpEl.appendChild(label);
+        for (const cp of f.codepoints) {
+          const s = document.createElement("span");
+          s.textContent = "U+" + cp.toString(16).toUpperCase().padStart(4, "0");
+          cpEl.appendChild(s);
+        }
+      }
+
+      findingsEl.style.display = "block";
+    });
+
+    // Allow Ctrl+Enter to submit.
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) btn.click();
+    });
+  </script>
+</body>
+</html>
