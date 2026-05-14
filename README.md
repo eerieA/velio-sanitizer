@@ -1,10 +1,10 @@
-# Velio - A Prompt Sanitizer
+# Velio - Minimal Prompt Sanitizer
 
 A deterministic, minimal, and auditable preprocessing layer for removing **invisible and control-based prompt injection vectors** from user input.
 
 <!-- TOC -->
 
-- [Velio - A Prompt Sanitizer](#velio---a-prompt-sanitizer)
+- [Velio - Minimal Prompt Sanitizer](#velio---minimal-prompt-sanitizer)
     - [Overview](#overview)
     - [Scope](#scope)
         - [What this sanitizer does](#what-this-sanitizer-does)
@@ -28,25 +28,24 @@ A deterministic, minimal, and auditable preprocessing layer for removing **invis
     - [Security Model](#security-model)
         - [Trust assumptions](#trust-assumptions)
         - [Key controls](#key-controls)
-            - [Input constraints](#input-constraints)
-            - [Output handling](#output-handling)
-            - [Runtime isolation](#runtime-isolation)
     - [Docker Deployment](#docker-deployment)
         - [Prerequisites](#prerequisites)
-        - [Setup](#setup)
-        - [Build and run](#build-and-run)
-        - [Stop](#stop)
+        - [Setup, build and run](#setup-build-and-run)
         - [Hardening applied](#hardening-applied)
+    - [CI / Supply Chain Security](#ci--supply-chain-security)
+        - [Threat: GitHub Actions cache poisoning](#threat-github-actions-cache-poisoning)
+        - [Mitigations in place](#mitigations-in-place)
+        - [Railway deployment setup](#railway-deployment-setup)
+        - [Switching providers](#switching-providers)
+        - [Railway CLI supply chain note](#railway-cli-supply-chain-note)
+        - [Next hardening step: hash-pinned dependencies](#next-hardening-step-hash-pinned-dependencies)
     - [Testing](#testing)
-        - [Core tests (`tests/testcore.py`)](#core-tests-teststestcorepy)
-        - [API tests (`tests/testapi.py`)](#api-tests-teststestapipy)
-        - [Fuzz testing (recommended, not yet implemented)](#fuzz-testing-recommended-not-yet-implemented)
+        - [Core tests](#core-tests)
+        - [API tests](#api-tests)
+        - [Fuzz testing (not yet implemented)](#fuzz-testing-not-yet-implemented)
     - [Observability](#observability)
         - [Logging (outside core)](#logging-outside-core)
         - [Metrics (optional)](#metrics-optional)
-    - [Usage Guidelines](#usage-guidelines)
-        - [Correct usage](#correct-usage)
-        - [Incorrect usage](#incorrect-usage)
     - [Non-Features](#non-features)
     - [Versioning](#versioning)
     - [Future Extensions (optional)](#future-extensions-optional)
@@ -294,17 +293,17 @@ All Unicode bidi characters are removed (full removal, not limited to override/i
 
 ### Key controls
 
-#### Input constraints
+**Input constraints**
 
 * Maximum input size: 50 KB (enforced by the API layer; validated on the UTF-8 encoded byte length)
 * Non-string input rejected with HTTP 422
 
-#### Output handling
+**Output handling**
 
 * Always render as plain text
 * Never inject into HTML without escaping
 
-#### Runtime isolation
+**Runtime isolation**
 
 * No secrets in environment
 * Prefer no outbound network access
@@ -318,7 +317,9 @@ All Unicode bidi characters are removed (full removal, not limited to override/i
 
 * Docker and Docker Compose installed on the host
 
-### Setup
+### Setup, build and run
+
+**Setup**
 
 ```bash
 cp .env.example .env
@@ -330,7 +331,7 @@ Edit `.env` to set the host port if the default (8000) conflicts with anything o
 HOST_PORT=<another-port>
 ```
 
-### Build and run
+**Build and run**
 
 ```bash
 docker compose up --build -d
@@ -338,7 +339,7 @@ docker compose up --build -d
 
 The service will be available at `http://<host>:${HOST_PORT}/`. The `--build` flag is only needed on first run or after code changes; subsequent starts can use `docker compose up -d`.
 
-### Stop
+**Stop**
 
 ```bash
 docker compose down
@@ -361,6 +362,63 @@ Additional recommendations for production
 
 ---
 
+## CI / Supply Chain Security
+
+### Threat: GitHub Actions cache poisoning
+
+`actions/cache` uses a runner-internal token — not the workflow's `GITHUB_TOKEN` — to write cache entries. This means `permissions: contents: read` does **not** prevent cache writes. A fork PR can therefore poison the pip/npm/pnpm cache with a malicious payload keyed to match the hash that the release workflow will later restore. The restored payload executes with full release-workflow permissions.
+
+This is not hypothetical. The [mini-shai-hulud campaign (May 2025)](https://www.mend.io/blog/mini-shai-hulud-is-back-172-npm-and-pypi-packages-compromised-in-latest-wave/) exploited exactly this vector against multiple open-source projects, including TanStack.
+
+### Mitigations in place
+
+**Two separate workflow files with different trust levels**
+
+| Workflow | Trigger | Cache | Secrets | Deploys |
+|---|---|---|---|---|
+| `pr-check.yml` | `pull_request` (any fork) | None | None | No |
+| `deploy.yml` | `push` to `main` | pip cache | `GITHUB_TOKEN`, deploy hook | Yes |
+
+Fork PRs run `pr-check.yml` only. Because it has no `actions/cache` step, a fork can never write to the cache that `deploy.yml` reads. Cache is used in `deploy.yml` safely because only pushes to the `main` branch trigger it.
+
+**All third-party actions pinned to full commit SHAs**
+
+Tags like `actions/checkout@v4` are mutable — they can be silently moved to point at a different, compromised commit. Commit SHAs are immutable. Every action in both workflow files is pinned by SHA with the tag noted in a comment for human readability.
+
+**Pinned dependency versions**
+
+`requirements.txt` pins exact versions of `fastapi` and `uvicorn`. The Dockerfile installs from this file rather than running `pip install fastapi uvicorn` with no version constraint, so every build is reproducible and an upstream version bump cannot silently change what gets deployed.
+
+### Railway deployment setup
+
+Before the first deploy, complete these steps:
+
+1. In Railway: Account Settings → Tokens → create a token
+2. In Railway: your service → Settings → copy the Service ID
+3. In GitHub: Settings → Secrets and variables → Actions → add two repository secrets:
+   - Name: `RAILWAY_TOKEN` — Value: token from step 1
+   - Name: `RAILWAY_SERVICE_ID` — Value: service ID from step 2
+4. In Railway: set your service's image to `ghcr.io/<your-github-username>/velio-sanitizer:latest`
+
+On every push to `main`, the workflow will run tests, build and push the Docker image to GHCR, then use the Railway CLI to trigger an immediate redeploy.
+
+### Switching providers
+
+The Railway-specific part is a two-step block at the end of `deploy.yml`, clearly labeled. Everything before it — test run, Docker build, GHCR push — is provider-agnostic. To switch providers, replace those two steps with whatever the new provider requires (a different CLI, a webhook `curl`, etc.).
+
+### Railway CLI supply chain note
+
+The Railway CLI is installed at workflow runtime via `curl | bash`. Two mitigations are in place:
+
+- The version is pinned (`RAILWAY_VERSION=4.58.0`) so the workflow always fetches the same release artifact. GitHub marks Railway releases as immutable, meaning the artifact at a given tag cannot be changed after publishing.
+- The install script is only executed in `deploy.yml`, which runs exclusively on push to `main` (our own code). Fork PRs never trigger this workflow, so the attack surface is limited to trusted commits.
+
+### Next hardening step: hash-pinned dependencies
+
+The current `requirements.txt` pins versions but not cryptographic hashes. `pip --require-hashes` can verify every wheel against a known hash, making it impossible for a compromised PyPI mirror to substitute a different package. Generating a fully hash-pinned lockfile requires running `pip-compile` on the target platform (`linux/amd64`) because `pydantic-core` ships platform-specific wheels with different hashes. Instructions are in the comment at the top of `requirements.txt`.
+
+---
+
 ## Testing
 
 Run the full test suite from the project root:
@@ -369,7 +427,7 @@ Run the full test suite from the project root:
 python -m pytest
 ```
 
-### Core tests (`tests/test_core.py`)
+### Core tests
 
 47 tests covering:
 
@@ -381,7 +439,7 @@ python -m pytest
 * Findings accuracy (per-category counts, codepoint list, total)
 * Edge cases (empty string, clean ASCII, clean Unicode, type error, determinism)
 
-### API tests (`tests/test_api.py`)
+### API tests
 
 14 tests covering:
 
@@ -390,7 +448,7 @@ python -m pytest
 * Input validation (missing field, invalid mode, oversized input, boundary)
 * Debug endpoint always forces mark mode
 
-### Fuzz testing (recommended, not yet implemented)
+### Fuzz testing (not yet implemented)
 
 * Random Unicode inputs
 * Ensure no crashes and stable output
@@ -408,22 +466,6 @@ python -m pytest
 
 * Frequency of invisible characters
 * Input size distribution
-
----
-
-## Usage Guidelines
-
-### Correct usage
-
-```
-User Input → Sanitizer → (optional detectors) → LLM
-```
-
-### Incorrect usage
-
-```
-User Input → Sanitizer → Trust completely → LLM
-```
 
 ---
 
