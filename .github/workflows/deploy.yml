@@ -66,18 +66,21 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
             ${{ env.IMAGE }}:latest
 
-      # --- Render deploy hook ---
-      # This is the only Render-specific step. To switch providers, replace
-      # this step with whatever your new provider requires (e.g. a Railway
-      # CLI call, a Fly.io `flyctl deploy`, or a webhook to another service).
+      # --- Railway deploy ---
+      # This is the only Railway-specific step. To switch providers, replace
+      # this step with whatever your new provider requires (e.g. a Fly.io
+      # `flyctl deploy`, a Render webhook, or another CLI call).
       #
       # Setup:
-      #   1. In Render: Dashboard → your service → Settings → Deploy Hook → copy URL
-      #   2. In GitHub: Settings → Secrets → Actions → New secret
-      #      Name: RENDER_DEPLOY_HOOK_URL   Value: <the URL from step 1>
-      #   3. In Render: set the image to ghcr.io/<your-org>/<your-repo>:latest
-      - name: Trigger Render deploy
-        run: |
-          curl --silent --show-error --fail \
-            --request POST \
-            "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+      #   1. In Railway: Account Settings → Tokens → create a token
+      #   2. In Railway: your service → Variables → copy the Service ID
+      #   3. In GitHub: Settings → Secrets → Actions → add two secrets:
+      #      RAILWAY_TOKEN     Value: token from step 1
+      #      RAILWAY_SERVICE_ID  Value: service ID from step 2
+      - name: Install Railway CLI
+        run: curl -fsSL https://railway.com/install.sh | sh
+
+      - name: Trigger Railway redeploy
+        run: railway redeploy --service ${{ secrets.RAILWAY_SERVICE_ID }} --yes
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
