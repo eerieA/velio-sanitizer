@@ -79,7 +79,7 @@ jobs:
       #      RAILWAY_SERVICE_ID  Value: service ID from step 2
       - name: Install Railway CLI
         run: |
-          curl -fsSL https://railway.com/install.sh | sh
+          curl -fsSL https://railway.com/install.sh | bash
           echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
       - name: Trigger Railway redeploy
