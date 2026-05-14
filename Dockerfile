@@ -4,9 +4,11 @@ RUN groupadd --system velio && useradd --system --gid velio --no-create-home vel
 
 WORKDIR /app
 
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY sanitizer/ ./sanitizer/
 COPY api/ ./api/
-RUN pip install --no-cache-dir fastapi uvicorn
 
 USER velio
 

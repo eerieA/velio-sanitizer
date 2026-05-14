@@ -1,0 +1,12 @@
+# Direct dependencies — pinned to exact versions.
+# To upgrade: change the versions here, rebuild the Docker image, run tests.
+#
+# Hash-pinning (--require-hashes) is the gold standard but requires hashes
+# for all transitive deps computed on the target platform (linux/amd64).
+# To generate a fully hash-pinned lockfile:
+#   docker run --rm -v "$PWD":/app -w /app python:3.13-slim \
+#     sh -c "pip install pip-tools && pip-compile --generate-hashes requirements.in"
+# Then replace this file with the output and add --require-hashes to the
+# Dockerfile RUN command.
+fastapi==0.136.1
+uvicorn==0.46.0

@@ -1,0 +1,33 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+
+# Minimal permissions — read-only. No cache, no secrets, safe for fork PRs.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # Pin every action to a full commit SHA, not a mutable tag.
+      # A mutable tag (actions/checkout@v4) can be silently replaced;
+      # a SHA cannot. Find SHAs at https://github.com/<owner>/<repo>/tags
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.13"
+        # No cache: here. Intentionally omitted — actions/cache uses a runner-internal
+        # token that is NOT gated by permissions: contents: read, so fork PRs can
+        # poison the cache used by the release workflow. Clean install is the safe default.
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest httpx
+
+      - name: Run tests
+        run: pytest
