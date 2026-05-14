@@ -78,7 +78,9 @@ jobs:
       #      RAILWAY_TOKEN     Value: token from step 1
       #      RAILWAY_SERVICE_ID  Value: service ID from step 2
       - name: Install Railway CLI
-        run: curl -fsSL https://railway.com/install.sh | sh
+        run: |
+          curl -fsSL https://railway.com/install.sh | sh
+          echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
       - name: Trigger Railway redeploy
         run: railway redeploy --service ${{ secrets.RAILWAY_SERVICE_ID }} --yes
