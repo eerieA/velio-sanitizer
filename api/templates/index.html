@@ -3,35 +3,141 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Velio Sanitizer</title>
+  <title>Velio — Unicode sanitizer for LLM input</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* --- Design tokens: dark (default) --- */
+    :root {
+      --bg:            #0f1117;
+      --bg-panel:      #161b22;
+      --bg-input:      #0d1117;
+      --bg-active:     #21262d;
+      --border:        #30363d;
+      --border-active: #21262d;
+      --text:          #c9d1d9;
+      --text-heading:  #e6edf3;
+      --text-muted:    #8b949e;
+      --text-empty:    #6e7681;
+      --accent:        #58a6ff;
+      --btn-bg:        #238636;
+      --btn-border:    #2ea043;
+      --btn-hover:     #2ea043;
+      --btn-active:    #1a7f37;
+      --marker-bg:     #3d1f00;
+      --marker-border: #7d3b00;
+      --marker-text:   #f0883e;
+      --nonzero:       #f0883e;
+      --error:         #f85149;
+      --cp-bg:         #21262d;
+      --theme-btn-bg:  #21262d;
+      --theme-btn-border: #30363d;
+      --theme-btn-color:  #8b949e;
+    }
+
+    /* --- Design tokens: light --- */
+    :root.light {
+      --bg:            #ffffff;
+      --bg-panel:      #f6f8fa;
+      --bg-input:      #ffffff;
+      --bg-active:     #eaeef2;
+      --border:        #d0d7de;
+      --border-active: #d0d7de;
+      --text:          #1f2328;
+      --text-heading:  #1f2328;
+      --text-muted:    #57606a;
+      --text-empty:    #8c959f;
+      --accent:        #0969da;
+      --btn-bg:        #1a7f37;
+      --btn-border:    #1a7f37;
+      --btn-hover:     #2da44e;
+      --btn-active:    #116329;
+      --marker-bg:     #fff3cd;
+      --marker-border: #e0a800;
+      --marker-text:   #7d4e00;
+      --nonzero:       #b35900;
+      --error:         #cf222e;
+      --cp-bg:         #eaeef2;
+      --theme-btn-bg:  #f6f8fa;
+      --theme-btn-border: #d0d7de;
+      --theme-btn-color:  #57606a;
+    }
+
+    /* --- Follow OS preference unless manually overridden --- */
+    @media (prefers-color-scheme: light) {
+      :root:not(.dark) {
+        --bg:            #ffffff;
+        --bg-panel:      #f6f8fa;
+        --bg-input:      #ffffff;
+        --bg-active:     #eaeef2;
+        --border:        #d0d7de;
+        --border-active: #d0d7de;
+        --text:          #1f2328;
+        --text-heading:  #1f2328;
+        --text-muted:    #57606a;
+        --text-empty:    #8c959f;
+        --accent:        #0969da;
+        --btn-bg:        #1a7f37;
+        --btn-border:    #1a7f37;
+        --btn-hover:     #2da44e;
+        --btn-active:    #116329;
+        --marker-bg:     #fff3cd;
+        --marker-border: #e0a800;
+        --marker-text:   #7d4e00;
+        --nonzero:       #b35900;
+        --error:         #cf222e;
+        --cp-bg:         #eaeef2;
+        --theme-btn-bg:  #f6f8fa;
+        --theme-btn-border: #d0d7de;
+        --theme-btn-color:  #57606a;
+      }
+    }
 
     body {
       font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
       font-size: 14px;
-      background: #0f1117;
-      color: #c9d1d9;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
       padding: 2rem;
+    }
+
+    .header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 0.25rem;
     }
 
     h1 {
       font-size: 1.2rem;
       font-weight: 600;
-      color: #e6edf3;
-      margin-bottom: 0.25rem;
+      color: var(--text-heading);
     }
+
+    #theme-btn {
+      background: var(--theme-btn-bg);
+      border: 1px solid var(--theme-btn-border);
+      border-radius: 6px;
+      color: var(--theme-btn-color);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 400;
+      padding: 0.2rem 0.6rem;
+    }
+
+    #theme-btn:hover { opacity: 0.8; }
 
     .subtitle {
       font-size: 0.8rem;
-      color: #6e7681;
+      color: var(--text-muted);
       margin-bottom: 2rem;
     }
 
     .panel {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
       border-radius: 6px;
       padding: 1rem;
     }
@@ -39,7 +145,7 @@
     label {
       display: block;
       font-size: 0.75rem;
-      color: #8b949e;
+      color: var(--text-muted);
       margin-bottom: 0.4rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -47,10 +153,10 @@
 
     textarea {
       width: 100%;
-      background: #0d1117;
-      border: 1px solid #30363d;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
       border-radius: 4px;
-      color: #c9d1d9;
+      color: var(--text);
       font-family: inherit;
       font-size: 13px;
       padding: 0.6rem;
@@ -58,7 +164,7 @@
       outline: none;
     }
 
-    textarea:focus { border-color: #58a6ff; }
+    textarea:focus { border-color: var(--accent); }
 
     .controls {
       display: flex;
@@ -68,8 +174,8 @@
     }
 
     button {
-      background: #238636;
-      border: 1px solid #2ea043;
+      background: var(--btn-bg);
+      border: 1px solid var(--btn-border);
       border-radius: 6px;
       color: #fff;
       cursor: pointer;
@@ -79,13 +185,13 @@
       padding: 0.4rem 1.2rem;
     }
 
-    button:hover { background: #2ea043; }
-    button:active { background: #1a7f37; }
+    button:hover { background: var(--btn-hover); }
+    button:active { background: var(--btn-active); }
 
     .mode-toggle {
       display: flex;
       gap: 0;
-      border: 1px solid #30363d;
+      border: 1px solid var(--border);
       border-radius: 6px;
       overflow: hidden;
     }
@@ -96,43 +202,43 @@
       margin: 0;
       padding: 0.4rem 0.9rem;
       cursor: pointer;
-      color: #8b949e;
+      color: var(--text-muted);
       text-transform: none;
       letter-spacing: 0;
       font-size: 13px;
-      background: #0d1117;
-      border-right: 1px solid #30363d;
+      background: var(--bg-input);
+      border-right: 1px solid var(--border);
       user-select: none;
     }
 
     .mode-toggle label:last-of-type { border-right: none; }
 
     .mode-toggle input[type="radio"]:checked + label {
-      background: #21262d;
-      color: #e6edf3;
+      background: var(--bg-active);
+      color: var(--text-heading);
     }
 
     .output-area {
       white-space: pre-wrap;
       word-break: break-all;
-      background: #0d1117;
-      border: 1px solid #30363d;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
       border-radius: 4px;
-      color: #c9d1d9;
+      color: var(--text);
       font-size: 13px;
       min-height: 6rem;
       padding: 0.6rem;
       line-height: 1.6;
     }
 
-    .output-area.empty { color: #6e7681; font-style: italic; }
+    .output-area.empty { color: var(--text-empty); font-style: italic; }
 
     /* highlight [U+XXXX] markers */
     .marker {
-      background: #3d1f00;
-      border: 1px solid #7d3b00;
+      background: var(--marker-bg);
+      border: 1px solid var(--marker-border);
       border-radius: 3px;
-      color: #f0883e;
+      color: var(--marker-text);
       font-size: 11px;
       padding: 0 3px;
     }
@@ -148,31 +254,31 @@
     }
 
     .findings th {
-      color: #8b949e;
+      color: var(--text-muted);
       font-weight: 400;
       padding: 0.3rem 0.5rem;
       text-align: left;
-      border-bottom: 1px solid #21262d;
+      border-bottom: 1px solid var(--border-active);
     }
 
     .findings td {
       padding: 0.3rem 0.5rem;
-      border-bottom: 1px solid #21262d;
-      color: #c9d1d9;
+      border-bottom: 1px solid var(--border-active);
+      color: var(--text);
     }
 
-    .findings td.zero { color: #6e7681; }
-    .findings td.nonzero { color: #f0883e; font-weight: 600; }
+    .findings td.zero { color: var(--text-empty); }
+    .findings td.nonzero { color: var(--nonzero); font-weight: 600; }
 
     .codepoints {
       margin-top: 0.5rem;
       font-size: 11px;
-      color: #8b949e;
+      color: var(--text-muted);
       word-break: break-all;
     }
 
     .codepoints span {
-      background: #21262d;
+      background: var(--cp-bg);
       border-radius: 3px;
       display: inline-block;
       margin: 2px;
@@ -184,7 +290,7 @@
       align-items: center;
       gap: 0.4rem;
       font-size: 13px;
-      color: #8b949e;
+      color: var(--text-muted);
       text-transform: none;
       letter-spacing: 0;
       cursor: pointer;
@@ -193,14 +299,14 @@
     }
 
     .checkbox-label input[type="checkbox"] {
-      accent-color: #58a6ff;
+      accent-color: var(--accent);
       cursor: pointer;
       width: 14px;
       height: 14px;
     }
 
     .error-msg {
-      color: #f85149;
+      color: var(--error);
       font-size: 12px;
       margin-top: 0.5rem;
     }
@@ -212,8 +318,11 @@
   </style>
 </head>
 <body>
-  <h1>Velio Sanitizer</h1>
-  <p class="subtitle">Deterministic removal of invisible and control-based prompt injection vectors.</p>
+  <div class="header">
+    <h1>Velio Sanitizer</h1>
+    <button id="theme-btn">light</button>
+  </div>
+  <p class="subtitle">Detect and remove hidden Unicode characters — zero-width spaces, bidi overrides, and variation selectors — before sending text to an LLM.</p>
 
   <div class="grid">
     <div class="panel">
@@ -357,6 +466,26 @@
     // Allow Ctrl+Enter to submit.
     inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) btn.click();
+    });
+
+    // Theme toggle — persists across page reloads via localStorage.
+    const themeBtn = document.getElementById("theme-btn");
+    const root = document.documentElement;
+    const osLight = window.matchMedia("(prefers-color-scheme: light)");
+
+    function applyTheme(theme) {
+      root.classList.toggle("light", theme === "light");
+      root.classList.toggle("dark", theme === "dark");
+      themeBtn.textContent = theme === "light" ? "dark" : "light";
+      localStorage.setItem("theme", theme);
+    }
+
+    // On load: use stored preference, otherwise follow OS.
+    const stored = localStorage.getItem("theme");
+    applyTheme(stored ?? (osLight.matches ? "light" : "dark"));
+
+    themeBtn.addEventListener("click", () => {
+      applyTheme(root.classList.contains("light") ? "dark" : "light");
     });
   </script>
 </body>

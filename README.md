@@ -1,11 +1,12 @@
-# Velio - Minimal Prompt Sanitizer
+# Velio — Unicode Sanitizer for LLM Input
 
-A deterministic, minimal, and auditable preprocessing layer for removing **invisible and control-based prompt injection vectors** from user input.
+A deterministic, minimal, and auditable Python library and REST API for detecting and removing **hidden Unicode characters** from user input before it reaches an LLM — including zero-width spaces, bidirectional overrides, and steganographic variation selectors.
 
 <!-- TOC -->
 
-- [Velio - Minimal Prompt Sanitizer](#velio---minimal-prompt-sanitizer)
+- [Velio — Unicode Sanitizer for LLM Input](#velio--unicode-sanitizer-for-llm-input)
     - [Overview](#overview)
+        - [What problem does this solve?](#what-problem-does-this-solve)
     - [Scope](#scope)
         - [What this sanitizer does](#what-this-sanitizer-does)
         - [What this sanitizer does NOT do](#what-this-sanitizer-does-not-do)
@@ -46,8 +47,7 @@ A deterministic, minimal, and auditable preprocessing layer for removing **invis
         - [Logging (outside core)](#logging-outside-core)
         - [Metrics (optional)](#metrics-optional)
     - [Non-Features](#non-features)
-    - [Versioning](#versioning)
-    - [Future Extensions (optional)](#future-extensions-optional)
+    - [Future Extensions](#future-extensions)
 
 <!-- /TOC -->
 
@@ -55,16 +55,23 @@ A deterministic, minimal, and auditable preprocessing layer for removing **invis
 
 ## Overview
 
-This project provides a **pure Python sanitizer** designed to normalize and clean input text before it is:
+Velio is a **pure Python sanitizer** designed to normalize and clean input text before it is sent to an LLM, displayed to users, or processed by downstream systems.
 
-* sent to an LLM
-* displayed to users
-* processed by downstream systems
+It focuses specifically on **rendering discrepancies** — cases where the text seen by a human differs from what a model actually receives. These discrepancies are a common vector for prompt injection attacks and Unicode-based text smuggling.
 
-It focuses specifically on **rendering discrepancies**—cases where the text seen by a human differs from what a model actually receives.
-
-> The core guarantee:
+> The guarantee:
 > **What the model sees is what a human can see.**
+
+### What problem does this solve?
+
+Attackers can embed invisible instructions in text using standard Unicode characters that most editors, browsers, and LLM chat UIs silently hide:
+
+- **Zero-width spaces and joiners** (`U+200B`, `U+200C`, `U+200D`) — invisible characters that can break token boundaries or hide text between visible words
+- **Bidirectional overrides** (`U+202A`–`U+202E`, `U+2066`–`U+2069`) — reverse the visual order of text so what a human reads differs from what the model receives
+- **Variation selectors** (`U+FE00`–`U+FE0F`, `U+E0100`–`U+E01EF`) — a steganography vector used to encode hidden ASCII messages invisibly within normal-looking text (see [ASCII smuggling](https://embracethered.com/blog/ascii-smuggler.html))
+- **Control characters** (`U+0000`–`U+001F`, `U+007F`) — raw control bytes that can confuse parsers and tokenizers
+
+Velio strips or marks all of these before text reaches your model, and reports exactly what was removed.
 
 ---
 
@@ -472,17 +479,7 @@ python -m pytest
 
 ---
 
-## Versioning
-
-This project follows semantic versioning:
-
-* PATCH: bug fixes
-* MINOR: backward-compatible behavior changes
-* MAJOR: breaking changes
-
----
-
-## Future Extensions (optional)
+## Future Extensions
 
 * HTML hidden-text stripping (for RAG pipelines)
 * “Reveal invisibles” visualization mode
