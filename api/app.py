@@ -21,6 +21,7 @@ app = FastAPI(
 class SanitizeRequest(BaseModel):
     text: str
     mode: Literal["strip", "mark"] = "strip"
+    strip_variation_selectors: bool = False
 
     @field_validator("text")
     @classmethod
@@ -34,6 +35,7 @@ class FindingsResponse(BaseModel):
     removed_control: int
     removed_format: int
     removed_bidi: int
+    removed_variation_selectors: int
     total: int
     codepoints: list[int]
 
@@ -55,13 +57,14 @@ def health() -> dict:
 
 @app.post("/sanitize", response_model=SanitizeResponse)
 def sanitize_text(req: SanitizeRequest) -> SanitizeResponse:
-    result = sanitize(req.text, mode=req.mode)
+    result = sanitize(req.text, mode=req.mode, strip_variation_selectors=req.strip_variation_selectors)
     return SanitizeResponse(
         text=result.text,
         findings=FindingsResponse(
             removed_control=result.findings.removed_control,
             removed_format=result.findings.removed_format,
             removed_bidi=result.findings.removed_bidi,
+            removed_variation_selectors=result.findings.removed_variation_selectors,
             total=result.findings.total,
             codepoints=result.findings.codepoints,
         ),

@@ -187,6 +187,58 @@ def test_codepoints_recorded():
 
 
 # ---------------------------------------------------------------------------
+# Variation Selectors (optional)
+# ---------------------------------------------------------------------------
+
+def test_variation_selector_ignored_by_default():
+    # U+FE00: not removed unless opt-in
+    result = sanitize("a︀b")
+    assert result.text == "a︀b"
+    assert result.findings.removed_variation_selectors == 0
+
+def test_variation_selector_fe_range_stripped():
+    result = sanitize("a︀b", strip_variation_selectors=True)
+    assert result.text == "ab"
+    assert result.findings.removed_variation_selectors == 1
+    assert 0xFE00 in result.findings.codepoints
+
+def test_variation_selector_supplement_stripped():
+    # U+E0100: first codepoint of supplement range
+    result = sanitize("a\U000E0100b", strip_variation_selectors=True)
+    assert result.text == "ab"
+    assert result.findings.removed_variation_selectors == 1
+    assert 0xE0100 in result.findings.codepoints
+
+def test_variation_selector_sequence_stripped():
+    # Simulated steganography payload: 3 variation selectors encoding hidden text
+    payload = "\U000E0163\U000E0155\U000E0153"
+    result = sanitize(payload, strip_variation_selectors=True)
+    assert result.text == ""
+    assert result.findings.removed_variation_selectors == 3
+
+def test_variation_selector_mark_mode():
+    result = sanitize("a\U000E0100b", mode="mark", strip_variation_selectors=True)
+    assert result.text == "a[U+E0100]b"
+    assert result.findings.removed_variation_selectors == 1
+
+def test_variation_selector_boundaries():
+    # U+FDFF: just before FE range — must not be stripped
+    # U+FE10: just after FE0F — must not be stripped
+    result = sanitize("﷿︐", strip_variation_selectors=True)
+    assert result.findings.removed_variation_selectors == 0
+    # U+E00FF: just before supplement range — must not be stripped
+    # U+E01F0: just after supplement range — must not be stripped
+    result = sanitize("\U000E00FF\U000E01F0", strip_variation_selectors=True)
+    assert result.findings.removed_variation_selectors == 0
+
+def test_variation_selector_not_counted_in_other_fields():
+    result = sanitize("a︀b", strip_variation_selectors=True)
+    assert result.findings.removed_format == 0
+    assert result.findings.removed_control == 0
+    assert result.findings.removed_bidi == 0
+
+
+# ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
 

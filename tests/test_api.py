@@ -60,6 +60,38 @@ def test_sanitize_findings_total_field():
 
 
 # ---------------------------------------------------------------------------
+# POST /sanitize — variation selectors
+# ---------------------------------------------------------------------------
+
+def test_sanitize_variation_selector_ignored_by_default():
+    r = client.post("/sanitize", json={"text": "a︀b"})
+    assert r.status_code == 200
+    body = r.json()
+    assert "︀" in body["text"]
+    assert body["findings"]["removed_variation_selectors"] == 0
+
+def test_sanitize_variation_selector_stripped_when_opted_in():
+    r = client.post("/sanitize", json={"text": "a︀b", "strip_variation_selectors": True})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["text"] == "ab"
+    assert body["findings"]["removed_variation_selectors"] == 1
+    assert 0xFE00 in body["findings"]["codepoints"]
+
+def test_sanitize_variation_selector_supplement_stripped():
+    r = client.post("/sanitize", json={"text": "a\U000E0100b", "strip_variation_selectors": True})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["text"] == "ab"
+    assert body["findings"]["removed_variation_selectors"] == 1
+
+def test_sanitize_variation_selector_mark_mode():
+    r = client.post("/sanitize", json={"text": "a\U000E0100b", "mode": "mark", "strip_variation_selectors": True})
+    assert r.status_code == 200
+    assert r.json()["text"] == "a[U+E0100]b"
+
+
+# ---------------------------------------------------------------------------
 # POST /sanitize — input validation
 # ---------------------------------------------------------------------------
 

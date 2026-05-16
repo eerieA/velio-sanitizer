@@ -179,6 +179,26 @@
       padding: 1px 5px;
     }
 
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 13px;
+      color: #8b949e;
+      text-transform: none;
+      letter-spacing: 0;
+      cursor: pointer;
+      margin: 0;
+      user-select: none;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      accent-color: #58a6ff;
+      cursor: pointer;
+      width: 14px;
+      height: 14px;
+    }
+
     .error-msg {
       color: #f85149;
       font-size: 12px;
@@ -208,6 +228,10 @@
           <input type="radio" name="mode" id="mode-strip" value="strip">
           <label for="mode-strip">strip</label>
         </div>
+        <label class="checkbox-label" for="opt-vs">
+          <input type="checkbox" id="opt-vs">
+          variation selectors
+        </label>
       </div>
     </div>
 
@@ -228,6 +252,7 @@
             <tr><td>Control (Cc)</td><td id="f-control" class="zero">0</td></tr>
             <tr><td>Format (Cf)</td><td id="f-format" class="zero">0</td></tr>
             <tr><td>Bidi</td><td id="f-bidi" class="zero">0</td></tr>
+            <tr><td>Variation selectors</td><td id="f-vs" class="zero">0</td></tr>
             <tr><td><strong>Total</strong></td><td id="f-total" class="zero">0</td></tr>
           </tbody>
         </table>
@@ -273,6 +298,7 @@
     btn.addEventListener("click", async () => {
       const text = inputEl.value;
       const mode = document.querySelector('input[name="mode"]:checked').value;
+      const strip_variation_selectors = document.getElementById("opt-vs").checked;
 
       errorEl.style.display = "none";
       findingsEl.style.display = "none";
@@ -284,7 +310,7 @@
         resp = await fetch("/sanitize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, mode }),
+          body: JSON.stringify({ text, mode, strip_variation_selectors }),
         });
         data = await resp.json();
       } catch (e) {
@@ -309,6 +335,7 @@
       cell("f-control", f.removed_control);
       cell("f-format", f.removed_format);
       cell("f-bidi", f.removed_bidi);
+      cell("f-vs", f.removed_variation_selectors);
       cell("f-total", f.total);
 
       const cpEl = document.getElementById("codepoints");
@@ -318,7 +345,8 @@
         cpEl.appendChild(label);
         for (const cp of f.codepoints) {
           const s = document.createElement("span");
-          s.textContent = "U+" + cp.toString(16).toUpperCase().padStart(4, "0");
+          const hex = cp.toString(16).toUpperCase();
+          s.textContent = "U+" + hex.padStart(hex.length > 4 ? 5 : 4, "0");
           cpEl.appendChild(s);
         }
       }
