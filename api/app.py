@@ -1,8 +1,11 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, field_validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from typing import Literal
 
 from sanitizer.core import sanitize
@@ -11,11 +14,15 @@ _TEMPLATES = Path(__file__).parent / "templates"
 
 MAX_INPUT_BYTES = 50_000
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Velio Sanitizer",
     description="Deterministic preprocessing layer for removing invisible and control-based prompt injection vectors.",
     version="0.1.0",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 class SanitizeRequest(BaseModel):
@@ -56,7 +63,8 @@ def health() -> dict:
 
 
 @app.post("/sanitize", response_model=SanitizeResponse)
-def sanitize_text(req: SanitizeRequest) -> SanitizeResponse:
+@limiter.limit("30/minute")
+def sanitize_text(request: Request, req: SanitizeRequest) -> SanitizeResponse:
     result = sanitize(req.text, mode=req.mode, strip_variation_selectors=req.strip_variation_selectors)
     return SanitizeResponse(
         text=result.text,
