@@ -66,19 +66,3 @@ def sanitize_text(req: SanitizeRequest) -> SanitizeResponse:
             codepoints=result.findings.codepoints,
         ),
     )
-
-
-@app.post("/sanitize/debug", response_model=SanitizeResponse)
-def sanitize_debug(req: SanitizeRequest) -> SanitizeResponse:
-    """Same as /sanitize but forces mark mode regardless of the request field."""
-    result = sanitize(req.text, mode="mark")
-    return SanitizeResponse(
-        text=result.text,
-        findings=FindingsResponse(
-            removed_control=result.findings.removed_control,
-            removed_format=result.findings.removed_format,
-            removed_bidi=result.findings.removed_bidi,
-            total=result.findings.total,
-            codepoints=result.findings.codepoints,
-        ),
-    )

@@ -19,7 +19,6 @@ A deterministic, minimal, and auditable preprocessing layer for removing **invis
             - [Run locally](#run-locally)
             - [Endpoints](#endpoints)
                 - [POST /sanitize](#post-sanitize)
-                - [POST /sanitize/debug](#post-sanitizedebug)
                 - [GET /health](#get-health)
     - [Character Set Policy](#character-set-policy)
         - [Control characters (`Cc`)](#control-characters-cc)
@@ -252,10 +251,6 @@ Sanitizes input text. Accepts an optional `mode` field (`"strip"` or `"mark"`, d
 
 Input is rejected with HTTP 422 if it exceeds 50 KB or if `mode` is not `"strip"` or `"mark"`.
 
-##### POST /sanitize/debug
-
-Same as `/sanitize` but always responds in `mark` mode regardless of the request field. Intended for human inspection of untrusted text.
-
 ##### GET /health
 
 Returns `{"status": "ok"}`. Use for liveness checks.
@@ -443,10 +438,9 @@ python -m pytest
 
 14 tests covering:
 
-* All three endpoints (`/health`, `/sanitize`, `/sanitize/debug`)
+* Both endpoints (`/health`, `/sanitize`)
 * Both output modes
 * Input validation (missing field, invalid mode, oversized input, boundary)
-* Debug endpoint always forces mark mode
 
 ### Fuzz testing (not yet implemented)
 

@@ -80,25 +80,3 @@ def test_sanitize_exactly_at_limit():
     ok = "a" * MAX_INPUT_BYTES
     r = client.post("/sanitize", json={"text": ok})
     assert r.status_code == 200
-
-
-# ---------------------------------------------------------------------------
-# POST /sanitize/debug — always mark mode
-# ---------------------------------------------------------------------------
-
-def test_debug_forces_mark_mode():
-    r = client.post("/sanitize/debug", json={"text": "hello​world"})
-    assert r.status_code == 200
-    assert r.json()["text"] == "hello[U+200B]world"
-
-def test_debug_ignores_strip_mode_field():
-    # Even if caller sends mode=strip, debug endpoint overrides to mark
-    r = client.post("/sanitize/debug", json={"text": "a\x00b", "mode": "strip"})
-    assert r.status_code == 200
-    assert r.json()["text"] == "a[U+0000]b"
-
-def test_debug_clean_text():
-    r = client.post("/sanitize/debug", json={"text": "clean"})
-    assert r.status_code == 200
-    assert r.json()["text"] == "clean"
-    assert r.json()["findings"]["total"] == 0
